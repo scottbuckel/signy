@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
 	log "github.com/sirupsen/logrus"
@@ -69,6 +70,8 @@ func (v *pullCmd) run() error {
 	if err != nil {
 		return err
 	}
+
+	spew.Dump(imageDigests.RepoDigests)
 
 	pulledSHA := ""
 	for _, element := range imageDigests.RepoDigests {
