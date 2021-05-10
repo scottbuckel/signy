@@ -2,48 +2,80 @@
  "signatures": [
   {
    "keyid": "556caebdc0877eed53d419b60eddb1e57fa773e4e31d70698b588f3e9cc48b35",
-   "sig": "02813858670c66647c17802d84f06453589f41850013a544609e9d33ba21fa19280e8371701f8274fb0c56bd95ff4f34c418456b002af9836ca218b584f51eb0eaacbb1c9bb57448101b07d058dec04d525551d157f6ae5e3679701735b1b8f52430f9b771d5476db1a2053cd93e2354f20061178a01705f2fa9ac82c7aeca4dd830e2672eb227127178d52328747ac819e50ec8ff52c662d7a4c58f5040d8f655fe595804f3e47c4fc98434c44e914445f7cb773439ebf813de8849dd1b533958f99f671d4e023d34c110d4b169cc02c12a3755ebe537147ff2479d244daaf719e24cf6b2fa6f47d0410d52d67217bcf4d4d4c2c7c0b92cd2bcd321edc69bc1430f78a188e712b8cb1fff0c14550cd01c41dae377256f31211fd249c5031bfee86e638bce6aa36aca349b787cef48255b0ef04bd0a21adb37b2a3da888d1530ca6ddeae5261e6fd65aa626d5caebbfae2986f842bd2ce94bcefe5dd0ae9c5b2028a15bd63bbea61be732207f0f5b58d056f118c830981747cb2b245d1377e17"
+   "sig": "83bd435600bb1c1bcb6d1aad196cdc04dbe101110f874e43c2fb7e64398990e0230b6a0dbb65461c6779af4a4e46c136366fa8737c1bafe122a104617bdf2a2379bf70db670a7e69d07cb361897889dfd3005346093db94ae1548283249c9da1c944f9c809bfc0445255ab2d1fe8252c26d1adf5f41f3aba288b8bc9c217c1c79227add9adc982b4b86fe7ee1ec448c3af589e4e5433fc17497445941e1e993de774fbc7fc82d7ca2a5ece9caedd37aeaeea6bed8faea2ee2373f761dd8f84fce6d23384ddba21e97f2ca0e9cad1bf437acf2ebd1985daa661a07ef1deca751951278db7a0187b36cdba218ba72a22fe9961dde6ffa53000d209f83aa39f02f22bc748d82a600a61b312e2e31ca963203b7a184a21d02287757241a2c4bfc2869cbd074470c5ab6955bdd67c6ff3be3901f04a1f39535987cdfb591359d6d5ed3434e6aecde07ccdcf0ce3408298edb364c3d913854cf8bc225bc80ba547ab3bb8a1f50e832931042dae745fd54ea7f913fce1506d3552630021c02f0711574d"
   }
  ],
  "signed": {
   "_type": "layout",
-  "expires": "2020-11-18T16:06:36Z",
+  "expires": "2026-06-11T09:53:02Z",
   "inspect": [
    {
     "_type": "inspection",
     "expected_materials": [
      [
       "MATCH",
-      "foo.tar.gz",
+      "demo-project.tar.gz",
       "WITH",
       "PRODUCTS",
       "FROM",
       "package"
      ],
      [
+      "ALLOW",
+      ".keep"
+     ],
+     [
+      "ALLOW",
+      "alice.pub"
+     ],
+     [
+      "ALLOW",
+      "root.layout"
+     ],
+     [
       "DISALLOW",
-      "foo.tar.gz"
+      "*"
      ]
     ],
     "expected_products": [
      [
       "MATCH",
-      "foo.py",
+      "demo-project/foo.py",
       "WITH",
       "PRODUCTS",
       "FROM",
-      "write-code"
+      "update-version"
+     ],
+     [
+      "ALLOW",
+      "demo-project/.git/*"
+     ],
+     [
+      "ALLOW",
+      "demo-project.tar.gz"
+     ],
+     [
+      "ALLOW",
+      ".keep"
+     ],
+     [
+      "ALLOW",
+      "alice.pub"
+     ],
+     [
+      "ALLOW",
+      "root.layout"
      ],
      [
       "DISALLOW",
-      "foo.py"
+      "*"
      ]
     ],
     "name": "untar",
     "run": [
      "tar",
-     "xfz",
-     "foo.tar.gz"
+     "xzf",
+     "demo-project.tar.gz"
     ]
    }
   ],
@@ -79,15 +111,23 @@
   "steps": [
    {
     "_type": "step",
-    "expected_command": [],
+    "expected_command": [
+     "git",
+     "clone",
+     "https://github.com/in-toto/demo-project.git"
+    ],
     "expected_materials": [],
     "expected_products": [
      [
-      "ALLOW",
-      "foo.py"
+      "CREATE",
+      "demo-project/foo.py"
+     ],
+     [
+      "DISALLOW",
+      "*"
      ]
     ],
-    "name": "write-code",
+    "name": "clone",
     "pubkeys": [
      "776a00e29f3559e0141b3b096f696abc6cfb0c657ab40f441132b345b08453f5"
     ],
@@ -95,20 +135,15 @@
    },
    {
     "_type": "step",
-    "expected_command": [
-     "tar",
-     "zcvf",
-     "foo.tar.gz",
-     "foo.py"
-    ],
+    "expected_command": [],
     "expected_materials": [
      [
       "MATCH",
-      "foo.py",
+      "demo-project/*",
       "WITH",
       "PRODUCTS",
       "FROM",
-      "write-code"
+      "clone"
      ],
      [
       "DISALLOW",
@@ -118,11 +153,51 @@
     "expected_products": [
      [
       "ALLOW",
-      "foo.tar.gz"
+      "demo-project/foo.py"
      ],
      [
-      "ALLOW",
-      "foo.py"
+      "DISALLOW",
+      "*"
+     ]
+    ],
+    "name": "update-version",
+    "pubkeys": [
+     "776a00e29f3559e0141b3b096f696abc6cfb0c657ab40f441132b345b08453f5"
+    ],
+    "threshold": 1
+   },
+   {
+    "_type": "step",
+    "expected_command": [
+     "tar",
+     "--exclude",
+     ".git",
+     "-zcvf",
+     "demo-project.tar.gz",
+     "demo-project"
+    ],
+    "expected_materials": [
+     [
+      "MATCH",
+      "demo-project/*",
+      "WITH",
+      "PRODUCTS",
+      "FROM",
+      "update-version"
+     ],
+     [
+      "DISALLOW",
+      "*"
+     ]
+    ],
+    "expected_products": [
+     [
+      "CREATE",
+      "demo-project.tar.gz"
+     ],
+     [
+      "DISALLOW",
+      "*"
      ]
     ],
     "name": "package",
