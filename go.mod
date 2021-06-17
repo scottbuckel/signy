@@ -14,6 +14,7 @@ require (
 	github.com/docker/docker v1.4.2-0.20191021213818-bebd8206285b
 	github.com/docker/go v1.5.1-1
 	github.com/docker/go-metrics v0.0.1 // indirect
+	github.com/gorilla/mux v1.7.3
 	github.com/hashicorp/go-version v1.2.0 // indirect
 	github.com/in-toto/in-toto-golang v0.0.0-20191106170227-857cd1cfa826
 	github.com/oklog/ulid v1.3.1
@@ -24,7 +25,8 @@ require (
 	github.com/theupdateframework/notary v0.6.1
 	golang.org/x/net v0.0.0-20210405180319-a5a99cb37ef4 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20210514084401-e8d321eab015 // indirect
+	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22 // indirect
+	golang.org/x/tools v0.1.3 // indirect
 	google.golang.org/genproto v0.0.0-20191009194640-548a555dbc03 // indirect
 	google.golang.org/grpc v1.24.0 // indirect
 )

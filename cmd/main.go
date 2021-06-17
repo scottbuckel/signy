@@ -60,6 +60,7 @@ func init() {
 		newSignCmd(),
 		newVerifyCmd(),
 		buildImageCommands(),
+		webserviceCommands(),
 		versionCmd,
 	)
 
