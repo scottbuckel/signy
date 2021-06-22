@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
-	"math/rand"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/docker/docker/api/types"
+	dockerClient "github.com/docker/docker/client"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -53,12 +56,34 @@ type WebServiceCommand struct {
 	WebServiceCommand string
 }
 
+var (
+	notaryCertPath string
+	notaryRootCa   string
+	notaryCliPath  string
+)
+
 func (v *WebServiceCommand) run() error {
 
 	port := os.Getenv("NOTARY_PORT")
 	if port == "" {
 		port = "4445"
 	}
+
+	notaryCertPath = os.Getenv("NOTARY_CERT_PATH")
+	if notaryCertPath == "" {
+		notaryCertPath = "/etc/certs/notary"
+	}
+
+	notaryRootCa = os.Getenv("NOTARY_ROOT_CA")
+	if notaryRootCa == "" {
+		notaryRootCa = "root-ca.crt"
+	}
+
+	notaryCliPath = os.Getenv("NOTARY_CLI_PATH")
+	if notaryCliPath == "" {
+		notaryCliPath = "/usr/local/bin/notary"
+	}
+
 	cfg := &tls.Config{
 		MinVersion:               tls.VersionTLS12,
 		CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
@@ -81,7 +106,10 @@ func (v *WebServiceCommand) run() error {
 		TLSConfig:    cfg,
 		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler), 0),
 	}
-	log.Fatal(srv.ListenAndServeTLS("notary-wrapper.crt", "notary-wrapper.key"))
+
+	log.Infof("Starting webservice on %v/signy", port)
+
+	log.Fatal(srv.ListenAndServeTLS(notaryCertPath+"/notary-wrapper.crt", notaryCertPath+"/notary-wrapper.key"))
 	log.Fatal(srv.ListenAndServe())
 
 	return nil
@@ -90,7 +118,6 @@ func (v *WebServiceCommand) run() error {
 type SignyReturn struct {
 	SignyValidation string `json:"SignyValidation"`
 	FailureReason   string `json:"FailureReason"`
-	RandomNumber    int    `json:"RandomNumber"`
 	ImageName       string `json:"ImageName"`
 }
 
@@ -116,17 +143,74 @@ func SignyHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(SignyReturn)
 	} else {
 		SignyReturn.ImageName = keys[0]
-		min := 1
-		max := 100
-		SignyReturn.RandomNumber = rand.Intn(max-min) + min
 
-		if SignyReturn.RandomNumber%2 == 0 {
-			SignyReturn.FailureReason = "Number was Even, Evens are failures"
-			SignyReturn.SignyValidation = "failure"
-		} else {
-			SignyReturn.FailureReason = ""
-			SignyReturn.SignyValidation = "success"
+		ctx := context.Background()
+		cli, err := dockerClient.NewClientWithOpts(dockerClient.FromEnv, dockerClient.WithAPIVersionNegotiation())
+
+		if err != nil {
+			//return fmt.Errorf("Couldn't initialize dockerClient")
 		}
+
+		//pull the image from the repository
+		log.Infof("Pulling image %v from registry", SignyReturn.ImageName)
+
+		_, err = cli.ImagePull(ctx, SignyReturn.ImageName, types.ImagePullOptions{})
+		if err != nil {
+			//return fmt.Errorf("Couldnt pull image %v", err)
+		}
+
+		//there has to be a better way do do this, we inspect the image we just pulled, that image has a few digests (for example, if an image was tagged multiple times)
+		imageDigests, _, err := cli.ImageInspectWithRaw(ctx, SignyReturn.ImageName)
+		if err != nil {
+			SignyReturn.FailureReason = err.Error()
+			SignyReturn.SignyValidation = "failure"
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(SignyReturn)
+			return
+		}
+
+		pulledSHA := ""
+		for _, element := range imageDigests.RepoDigests {
+
+			//remove the tag, since we have only digest now (image@sha256:)
+			parts := strings.Split(SignyReturn.ImageName, ":")
+
+			if strings.Contains(element, parts[0]) {
+				//remove the image:@sha256, return only the actual sha
+				pulledSHA = strings.Split(element, ":")[1]
+			}
+		}
+
+		log.Infof("Successfully pulled image %v", SignyReturn.ImageName)
+		SignyReturn.ImageName = pulledSHA
+
+		SignyReturn.FailureReason = ""
+		SignyReturn.SignyValidation = "success"
+
+		/*
+			//pull the data from notary
+			target, trustedSHA, err := tuf.GetTargetAndSHA(SignyReturn.ImageName, trustServer, tlscacert, trustDir, timeout)
+			if err != nil {
+				log.Infof("Error: %v", err)
+			}
+
+			if pulledSHA == trustedSHA {
+				log.Infof("Pulled SHA matches TUF SHA: SHA256: %v matches %v", pulledSHA, trustedSHA)
+			} else {
+				//return fmt.Errorf("Pulled image digest doesn't match TUF SHA! Pulled SHA: %v doesn't match TUF SHA: %v ", pulledSHA, trustedSHA)
+			}
+
+			if target.Custom == nil {
+				//return fmt.Errorf("Error: TUF server doesn't have the custom field filled with in-toto metadata")
+			}
+
+			/*
+				TODO: Allow other verifications like `Signy verify` does, also fail better when RuleVerificationError happen
+					//return intoto.VerifyInContainer(target, []byte(v.pullImage), v.verificationImage, logLevel)
+		*/
+		//return intoto.VerifyOnOS(target, []byte(v.pullImage))
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(200)
