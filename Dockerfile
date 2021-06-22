@@ -27,7 +27,7 @@ ENV DOCKER_TLS_CERTDIR=
 #WORKDIR /
 
 #ENTRYPOINT ["dockerd-entrypoint.sh & && /opt/signy/bin/signy webservice serve"]
-CMD ["/opt/signy/bin/signy", "webservice", "serve"]
+#CMD ["/opt/signy/bin/signy", "webservice", "serve"]
 
 #COPY multipleProcess.sh multipleProcess.sh
 #CMD ./multipleProcess.sh
