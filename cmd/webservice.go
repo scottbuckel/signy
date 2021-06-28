@@ -156,7 +156,13 @@ func SignyHandler(w http.ResponseWriter, r *http.Request) {
 
 		_, err = cli.ImagePull(ctx, SignyReturn.ImageName, types.ImagePullOptions{})
 		if err != nil {
-			//return fmt.Errorf("Couldnt pull image %v", err)
+			SignyReturn.FailureReason = err.Error()
+			SignyReturn.SignyValidation = "failure"
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(SignyReturn)
+			return
 		}
 
 		//there has to be a better way do do this, we inspect the image we just pulled, that image has a few digests (for example, if an image was tagged multiple times)
