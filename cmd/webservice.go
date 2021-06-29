@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"strings"
@@ -154,7 +155,19 @@ func SignyHandler(w http.ResponseWriter, r *http.Request) {
 		//pull the image from the repository
 		log.Infof("Pulling image %v from registry", SignyReturn.ImageName)
 
-		_, err = cli.ImagePull(ctx, SignyReturn.ImageName, types.ImagePullOptions{})
+		reader, err := cli.ImagePull(ctx, SignyReturn.ImageName, types.ImagePullOptions{})
+		/* Trick from https://github.com/moby/moby/issues/28646 to wait for EOF, since ImagePull is Asynchronous */
+		buf := make([]byte, 32*1024)
+		for {
+			_, er := reader.Read(buf)
+			if er != nil {
+				if er != io.EOF {
+					err = er
+				}
+				break
+			}
+		}
+
 		if err != nil {
 			SignyReturn.FailureReason = err.Error()
 			SignyReturn.SignyValidation = "failure"
