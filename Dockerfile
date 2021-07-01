@@ -22,7 +22,7 @@ WORKDIR /opt/signy/bin
 COPY bin/notary-wrapper.crt /etc/certs/notary/notary-wrapper.crt
 COPY bin/notary-wrapper.key /etc/certs/notary/notary-wrapper.key
 COPY bin/root-ca.crt /etc/certs/notary/root-ca.crt
-COPY bin/root-ca.crt /etc/certs/notary/notary-server-svc
+#COPY bin/root-ca.crt /etc/certs/notary/notary-server-svc
 
 
 

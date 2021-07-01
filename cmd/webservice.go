@@ -209,7 +209,7 @@ func SignyHandler(w http.ResponseWriter, r *http.Request) {
 
 		//trustServer := "notary-server-svc:4443"
 		//trustServer := "https://notaryserver:4443"
-		target, trustedSHA, err := tuf.GetTargetAndSHA(SignyReturn.ImageName, notary_server, notaryCertPath+"/"+notaryRootCa, "/home/rootless/.signy/", "5s")
+		target, trustedSHA, err := tuf.GetTargetAndSHA(SignyReturn.ImageName, notary_server, "/etc/certs/notary/notary-server-svc/root-ca.crt", "/home/rootless/.signy/", "5s")
 		if err != nil {
 			SignyReturn.FailureReason = err.Error()
 			SignyReturn.SignyValidation = "failure"
