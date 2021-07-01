@@ -21,6 +21,9 @@ WORKDIR /opt/signy/bin
 
 COPY bin/notary-wrapper.crt /etc/certs/notary/notary-wrapper.crt
 COPY bin/notary-wrapper.key /etc/certs/notary/notary-wrapper.key
+COPY bin/root-ca.crt /etc/certs/notary/root-ca.crt
+COPY bin/root-ca.crt /etc/certs/notary/notary-server-svc
+
 
 
 
@@ -88,6 +91,8 @@ VOLUME /home/rootless/.local/share/docker
 USER rootless
 
 
+# "/run/user/UID" will be used by default as the value of XDG_RUNTIME_DIR
+RUN mkdir /home/rootless/.signy && chmod 1777 /home/rootless/.signy
 
 CMD sh -c 'dockerd-entrypoint.sh -D &' && /opt/signy/bin/signy webservice serve
 

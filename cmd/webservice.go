@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cnabio/signy/pkg/intoto"
+	"github.com/cnabio/signy/pkg/tuf"
 	"github.com/docker/docker/api/types"
 	dockerClient "github.com/docker/docker/client"
 	"github.com/gorilla/mux"
@@ -77,12 +79,7 @@ func (v *WebServiceCommand) run() error {
 
 	notaryRootCa = os.Getenv("NOTARY_ROOT_CA")
 	if notaryRootCa == "" {
-		notaryRootCa = "root-ca.crt"
-	}
-
-	notaryCliPath = os.Getenv("NOTARY_CLI_PATH")
-	if notaryCliPath == "" {
-		notaryCliPath = "/usr/local/bin/notary"
+		notaryRootCa = "notary-server-svc"
 	}
 
 	cfg := &tls.Config{
@@ -124,6 +121,11 @@ type SignyReturn struct {
 
 func SignyHandler(w http.ResponseWriter, r *http.Request) {
 
+	notary_server := os.Getenv("notary_server")
+	if notary_server == "" {
+		notary_server = "https://notary-server-svc.notary.svc:4443"
+	}
+
 	dt := time.Now()
 
 	log.Infof("Incoming webservice call: %v", dt.String())
@@ -156,7 +158,19 @@ func SignyHandler(w http.ResponseWriter, r *http.Request) {
 		log.Infof("Pulling image %v from registry", SignyReturn.ImageName)
 
 		reader, err := cli.ImagePull(ctx, SignyReturn.ImageName, types.ImagePullOptions{})
-		/* Trick from https://github.com/moby/moby/issues/28646 to wait for EOF, since ImagePull is Asynchronous */
+		if err != nil {
+			SignyReturn.FailureReason = err.Error()
+			SignyReturn.SignyValidation = "failure"
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(SignyReturn)
+			return
+		}
+		/*
+			Trick from https://github.com/moby/moby/issues/28646 to wait for EOF, since ImagePull is Asynchronous
+			TODO: configurable timeout? https://gist.github.com/ngauthier/d6e6f80ce977bedca601
+		*/
 		buf := make([]byte, 32*1024)
 		for {
 			_, er := reader.Read(buf)
@@ -167,16 +181,7 @@ func SignyHandler(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 		}
-
-		if err != nil {
-			SignyReturn.FailureReason = err.Error()
-			SignyReturn.SignyValidation = "failure"
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(200)
-			json.NewEncoder(w).Encode(SignyReturn)
-			return
-		}
+		defer reader.Close()
 
 		//there has to be a better way do do this, we inspect the image we just pulled, that image has a few digests (for example, if an image was tagged multiple times)
 		imageDigests, _, err := cli.ImageInspectWithRaw(ctx, SignyReturn.ImageName)
@@ -201,6 +206,47 @@ func SignyHandler(w http.ResponseWriter, r *http.Request) {
 				pulledSHA = strings.Split(element, ":")[1]
 			}
 		}
+
+		//trustServer := "notary-server-svc:4443"
+		//trustServer := "https://notaryserver:4443"
+		target, trustedSHA, err := tuf.GetTargetAndSHA(SignyReturn.ImageName, notary_server, notaryCertPath+"/"+notaryRootCa, "/home/rootless/.signy/", "5s")
+		if err != nil {
+			SignyReturn.FailureReason = err.Error()
+			SignyReturn.SignyValidation = "failure"
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(SignyReturn)
+			return
+		}
+
+		if pulledSHA == trustedSHA {
+			log.Infof("Pulled SHA matches TUF SHA: SHA256: %v matches %v", pulledSHA, trustedSHA)
+		} else {
+
+			SignyReturn.FailureReason = "Pulled image digest doesn't match TUF SHA! Pulled SHA: " + pulledSHA + " doesn't match TUF SHA: " + trustedSHA
+			SignyReturn.SignyValidation = "failure"
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(SignyReturn)
+			return
+		}
+
+		if target.Custom == nil {
+
+			SignyReturn.FailureReason = "Error: TUF server doesn't have the custom field filled with in-toto metadata"
+			SignyReturn.SignyValidation = "failure"
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(SignyReturn)
+			return
+
+		}
+
+		err = intoto.VerifyOnOS(target, []byte(SignyReturn.ImageName))
+		log.Infof("Error was:", err)
 
 		log.Infof("Successfully pulled image %v", SignyReturn.ImageName)
 		SignyReturn.ImageName = pulledSHA
