@@ -246,11 +246,18 @@ func SignyHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		err = intoto.VerifyOnOS(target, []byte(SignyReturn.ImageName))
-		log.Infof("Error was:", err)
+		if err != nil {
+			log.Infof("Error was:", err)
+			SignyReturn.FailureReason = err.Error()
+			SignyReturn.SignyValidation = "failure"
 
-		log.Infof("Successfully pulled image %v", SignyReturn.ImageName)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(200)
+			json.NewEncoder(w).Encode(SignyReturn)
+			return
+		}
+
 		SignyReturn.ImageName = pulledSHA
-
 		SignyReturn.FailureReason = ""
 		SignyReturn.SignyValidation = "success"
 
